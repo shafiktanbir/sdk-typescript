@@ -661,4 +661,34 @@ describe("ingress auto-retry", () => {
     expect(signals[0]).not.toBe(signals[1]);
     expect(signals[0]?.aborted).toBe(false);
   });
+
+  it("merges per-call headers into workflowAttach and workflowOutput requests", async () => {
+    queue(ok({ result: "attached" }), ok({ result: "polled" }));
+    const wf = connect({
+      url: URL,
+      headers: { "x-conn": "conn-val", "x-override": "from-conn" },
+    }).workflowClient(testWorkflow, "workflow-id");
+
+    await wf.workflowAttach(
+      Opts.from({
+        headers: { "x-call": "attach-val", "x-override": "from-attach" },
+      })
+    );
+    await wf.workflowOutput(
+      Opts.from({
+        headers: { "x-call": "output-val", "x-override": "from-output" },
+      })
+    );
+
+    expect(attemptHeaders()[0]).toMatchObject({
+      "x-conn": "conn-val",
+      "x-call": "attach-val",
+      "x-override": "from-attach",
+    });
+    expect(attemptHeaders()[1]).toMatchObject({
+      "x-conn": "conn-val",
+      "x-call": "output-val",
+      "x-override": "from-output",
+    });
+  });
 });
